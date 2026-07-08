@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Apply — Free Food Stockpile</title>
+<meta name="description" content="Apply for free groceries and ready-to-eat meal support with Free Food Stockpile. A short, secure application for approved individuals and families in Hudson Valley, NY.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🥗</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="wrap hbar">
+    <a class="brand" href="index.html" aria-label="Free Food Stockpile home">
+      <svg class="logo" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <rect width="48" height="48" rx="13" fill="#2f7d4f"/>
+        <path d="M14 27c0-5 4-9 10-9s10 4 10 9v1H14v-1z" fill="#fbfaf4"/>
+        <path d="M24 18c0-4 2.6-7 6.5-7.5C30 15 27 17.5 24 18z" fill="#43a86e"/>
+        <path d="M24 18c0-3.2-2.2-6-5.6-6.6C18.8 15 21.4 17 24 18z" fill="#8fd0a8"/>
+        <path d="M24 8.5V18" stroke="#215a39" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M13 30h22" stroke="#2f7d4f" stroke-width="2.4" stroke-linecap="round"/>
+      </svg>
+      <span class="name">Free Food <span>Stockpile</span><small>Hudson Valley, NY</small></span>
+    </a>
+    <nav class="nav">
+      <a href="index.html#how">How it works</a>
+      <a href="index.html#qualify">Who qualifies</a>
+      <a href="tel:+18452480680" class="btn ghost">(845) 248-0680</a>
+    </nav>
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<div class="form-hero">
+  <div class="wrap">
+    <h1>Apply for food support</h1>
+    <p>It only takes a few minutes. Your information is kept private and used only to review your eligibility.</p>
+  </div>
+</div>
+
+<div class="form-wrap">
+  <div class="progress" id="progress">
+    <div class="p active" data-step="1"><div class="c">1</div><div class="lbl">Applicant</div></div>
+    <div class="p" data-step="2"><div class="c">2</div><div class="lbl">Eligibility</div></div>
+    <div class="p" data-step="3"><div class="c">✓</div><div class="lbl">Done</div></div>
+  </div>
+
+  <form id="applyForm" class="card" novalidate>
+    <!-- STEP 1 -->
+    <section class="fstep" data-step="1">
+      <h2 class="step-title">Applicant information</h2>
+      <p class="step-sub">Tell us a little about the main applicant.</p>
+      <div class="grid2">
+        <div class="field"><label>First name <span class="req">*</span></label><input name="First Name" required></div>
+        <div class="field"><label>Last name <span class="req">*</span></label><input name="Last Name" required></div>
+        <div class="field"><label>Date of birth <span class="req">*</span></label><input type="date" name="Date of Birth" required></div>
+        <div class="field"><label>Medicaid CIN ID <span class="req">*</span></label><input name="Medicaid CIN ID" required><div class="hint">Found on your Medicaid benefit card.</div></div>
+        <div class="field"><label>Phone <span class="req">*</span></label><input type="tel" name="Phone" required></div>
+        <div class="field"><label>Email</label><input type="email" name="Email"></div>
+        <div class="field full"><label>Street address</label><input name="Street Address"></div>
+        <div class="field"><label>City / Town</label><input name="City"></div>
+        <div class="field"><label>Area / Region</label>
+          <select name="Region">
+            <option value="">Select…</option>
+            <option>Hudson Valley</option><option>Monroe</option><option>Kiryas Joel</option>
+            <option>Monsey</option><option>Rockland</option><option>Orange County</option>
+            <option>Brooklyn</option><option>Other</option>
+          </select></div>
+        <div class="field"><label>State <span class="req">*</span></label><input name="State" value="NY" required></div>
+        <div class="field"><label>ZIP code <span class="req">*</span></label><input name="ZIP Code" required></div>
+        <div class="field full"><label>Language preference</label>
+          <select name="Language Preference">
+            <option>English</option><option>Yiddish</option><option>Spanish</option><option>Hebrew</option><option>Other</option>
+          </select></div>
+      </div>
+
+      <h2 class="step-title" style="margin-top:28px;font-size:20px">Household members</h2>
+      <p class="step-sub">Add everyone living in your home who this may help. You can add more than one.</p>
+      <div id="hhList"></div>
+      <button type="button" class="add-hh" id="addHh">＋ Add household member</button>
+
+      <div class="form-nav">
+        <span></span>
+        <button type="button" class="btn" id="toStep2">Continue →</button>
+      </div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="fstep hide" data-step="2">
+      <h2 class="step-title">Eligibility &amp; needs</h2>
+      <p class="step-sub">A few quick questions to see how we can help.</p>
+
+      <div class="note-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>You do not need to upload anything now. If a photo of your Medicaid card is needed, our team will help you with it when we contact you.</span>
+      </div>
+
+      <div class="field full"><label>Does anyone in your household have a serious or chronic health condition?</label>
+        <select name="Chronic Condition in Household">
+          <option value="">Select…</option>
+          <option>Yes</option><option>No</option><option>Prefer not to say</option>
+        </select>
+        <div class="hint">Examples: Alzheimer's / dementia, renal (kidney) failure, COPD, HIV/AIDS, cancer, diabetes, a serious mental health condition, or a substance use disorder.</div>
+      </div>
+      <div class="field full"><label>If yes, please specify the condition(s)</label>
+        <input name="Condition Details" placeholder="e.g. diabetes, heart condition…"></div>
+
+      <div class="field full"><label>In the past 12 months, did you worry your food would run out before you had money for more? <span class="req">*</span></label>
+        <select name="Food Insecurity" required>
+          <option value="">Select…</option>
+          <option>Often true</option><option>Sometimes true</option><option>Never true</option>
+        </select>
+        <div class="hint">An answer of "Never true" generally does not qualify for services.</div>
+      </div>
+
+      <div class="field full"><label>Are you currently receiving home-delivered meals through a NYS social services program? <span class="req">*</span></label>
+        <select name="Currently Receiving Meals" required>
+          <option value="">Select…</option>
+          <option>No</option><option>Yes</option>
+        </select>
+      </div>
+
+      <div class="field full"><label>Anything else we should know?</label>
+        <textarea name="Notes" placeholder="Optional — tell us anything that helps us serve you better."></textarea></div>
+
+      <div class="consent">
+        <input type="checkbox" id="consent" name="Consent" value="I agree" required>
+        <label for="consent">I confirm the information provided is accurate and complete to the best of my knowledge, and I consent to Free Food Stockpile using it for program enrollment and coordination. <span class="req">*</span></label>
+      </div>
+
+      <!-- FormSubmit config -->
+      <input type="hidden" name="_subject" value="New Free Food Stockpile application">
+      <input type="hidden" name="_template" value="table">
+      <input type="hidden" name="_captcha" value="false">
+
+      <div class="form-nav">
+        <button type="button" class="btn ghost" id="backStep1">← Back</button>
+        <button type="submit" class="btn warm" id="submitBtn">Submit application ✓</button>
+      </div>
+    </section>
+
+    <!-- SUCCESS -->
+    <section class="fstep hide" data-step="3">
+      <div class="success">
+        <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <h2>Application received!</h2>
+        <p>Thank you. Our local team will review your information and reach out to you soon to arrange your
+          free food and meal support. If you have questions, call or text us at <a href="tel:+18452480680">(845) 248-0680</a>.</p>
+        <p style="margin-top:20px"><a href="index.html" class="btn">Back to home</a></p>
+      </div>
+    </section>
+  </form>
+</div>
+
+<footer class="foot">
+  <div class="wrap foot-bot" style="border:0;margin:0;padding-top:0">
+    <span>© <span id="yr">2026</span> Free Food Stockpile — Hudson Valley, NY</span>
+    <span class="disc">Your information is kept private and used only for program review and coordination.</span>
+  </div>
+</footer>
+
+<script>window.FFS_FORM_EMAIL = "millerkjhs@gmail.com";</script>
+<script src="assets/site.js"></script>
+</body>
+</html>
