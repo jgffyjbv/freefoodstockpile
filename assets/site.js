@@ -53,14 +53,26 @@
     d.innerHTML =
       '<button type="button" class="rm">Remove ✕</button>' +
       '<div class="grid2">' +
-        '<div class="field"><label>Full name</label><input class="hh-name" placeholder="Name"></div>' +
-        '<div class="field"><label>Date of birth</label><input type="date" class="hh-dob"></div>' +
+        '<div class="field"><label>Full name <span class="req">*</span></label><input class="hh-name" placeholder="Name"></div>' +
+        '<div class="field"><label>Date of birth</label><input type="date" class="hh-dob"><div class="hint">Optional — but including it helps us process your application faster.</div></div>' +
         '<div class="field full"><label>Relationship</label><input class="hh-rel" placeholder="e.g. spouse, child, parent"></div>' +
       '</div>';
     d.querySelector('.rm').addEventListener('click', function () { d.remove(); });
     hhList.appendChild(d);
     d.querySelector('.hh-name').focus();
   });
+
+  function validateHousehold() {
+    var ok = true;
+    hhList.querySelectorAll('.hh-member').forEach(function (m) {
+      var name = m.querySelector('.hh-name');
+      var hasAny = name.value.trim() || m.querySelector('.hh-dob').value.trim() || m.querySelector('.hh-rel').value.trim();
+      var bad = hasAny && !name.value.trim();
+      name.style.borderColor = bad ? '#e0523a' : '';
+      if (bad) { ok = false; name.focus(); }
+    });
+    return ok;
+  }
 
   function compileHousehold() {
     var out = [];
@@ -75,9 +87,19 @@
 
   // ---- nav buttons ----
   document.getElementById('toStep2').addEventListener('click', function () {
-    if (validate(form.querySelector('.fstep[data-step="1"]'))) showStep(2);
+    var s1 = form.querySelector('.fstep[data-step="1"]');
+    if (validate(s1) && validateHousehold()) showStep(2);
   });
   document.getElementById('backStep1').addEventListener('click', function () { showStep(1); });
+
+  // ---- Medicaid card upload: 10MB client-side check ----
+  var fileInput = document.getElementById('medicaidCard');
+  var fileError = document.getElementById('fileError');
+  if (fileInput) fileInput.addEventListener('change', function () {
+    var tooBig = fileInput.files[0] && fileInput.files[0].size > 10 * 1024 * 1024;
+    fileError.style.display = tooBig ? 'block' : 'none';
+    if (tooBig) fileInput.value = '';
+  });
 
   // ---- submit ----
   form.addEventListener('submit', function (e) {
@@ -88,24 +110,28 @@
     var btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.textContent = 'Submitting…';
 
-    // gather all named fields (skip the per-member UI inputs)
-    var data = {};
+    // multipart FormData so the optional Medicaid-card file rides along
+    var fd = new FormData();
     form.querySelectorAll('input[name], select[name], textarea[name]').forEach(function (f) {
-      if (f.type === 'checkbox') { data[f.name] = f.checked ? f.value : 'No'; }
-      else data[f.name] = f.value;
+      if (f.type === 'file') { if (f.files[0]) fd.append(f.name, f.files[0]); }
+      else if (f.type === 'checkbox') { fd.append(f.name, f.checked ? f.value : 'No'); }
+      else fd.append(f.name, f.value);
     });
-    data['Household Members'] = compileHousehold();
+    fd.append('Household Members', compileHousehold());
 
     var email = window.FFS_FORM_EMAIL || 'millerkjhs@gmail.com';
     fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify(data)
+      headers: { 'Accept': 'application/json' },
+      body: fd
     }).then(function (r) { return r.json(); })
-      .then(function () { showStep(3); })
+      .then(function (res) {
+        if (res && (res.success === true || res.success === 'true')) { showStep(3); return; }
+        throw new Error('send failed');
+      })
       .catch(function () {
-        // Even if the AJAX gateway hiccups, show success but keep a fallback note.
-        showStep(3);
+        btn.disabled = false; btn.textContent = 'Submit application ✓';
+        alert('We could not send your application just now. Please try again in a moment — or call or text us at (845) 540-5512 and we will take your application by phone.');
       });
   });
 })();

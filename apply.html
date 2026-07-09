@@ -30,7 +30,7 @@
     <nav class="nav">
       <a href="index.html#how">How it works</a>
       <a href="index.html#qualify">Who qualifies</a>
-      <a href="tel:+18452480680" class="btn ghost">(845) 248-0680</a>
+      <a href="tel:+18455405512" class="btn ghost">(845) 540-5512</a>
     </nav>
     <button class="menu-btn" id="menuBtn" aria-label="Menu">☰</button>
   </div>
@@ -58,8 +58,9 @@
       <div class="grid2">
         <div class="field"><label>First name <span class="req">*</span></label><input name="First Name" required></div>
         <div class="field"><label>Last name <span class="req">*</span></label><input name="Last Name" required></div>
-        <div class="field"><label>Date of birth <span class="req">*</span></label><input type="date" name="Date of Birth" required></div>
-        <div class="field"><label>Medicaid CIN ID <span class="req">*</span></label><input name="Medicaid CIN ID" required><div class="hint">Found on your Medicaid benefit card.</div></div>
+        <div class="field"><label>Date of birth</label><input type="date" name="Date of Birth"><div class="hint">Optional — but including it helps us process your application faster.</div></div>
+        <div class="field"><label>Medicaid CIN ID</label><input name="Medicaid CIN ID"><div class="hint">Optional. Found on your Medicaid benefit card.</div></div>
+        <div class="field"><label>Social Security Number</label><input name="Social Security Number" inputmode="numeric" autocomplete="off" placeholder="___-__-____"><div class="hint">Optional — but including it helps us process your application faster.</div></div>
         <div class="field"><label>Phone <span class="req">*</span></label><input type="tel" name="Phone" required></div>
         <div class="field"><label>Email</label><input type="email" name="Email"></div>
         <div class="field full"><label>Street address</label><input name="Street Address"></div>
@@ -71,16 +72,19 @@
             <option>Monsey</option><option>Rockland</option><option>Orange County</option>
             <option>Brooklyn</option><option>Other</option>
           </select></div>
-        <div class="field"><label>State <span class="req">*</span></label><input name="State" value="NY" required></div>
-        <div class="field"><label>ZIP code <span class="req">*</span></label><input name="ZIP Code" required></div>
+        <div class="field"><label>State</label><input name="State" value="NY"></div>
+        <div class="field"><label>ZIP code</label><input name="ZIP Code"></div>
         <div class="field full"><label>Language preference</label>
           <select name="Language Preference">
             <option>English</option><option>Yiddish</option><option>Spanish</option><option>Hebrew</option><option>Other</option>
           </select></div>
       </div>
 
-      <h2 class="step-title" style="margin-top:28px;font-size:20px">Household members</h2>
+      <h2 class="step-title" style="margin-top:28px;font-size:20px">Household</h2>
       <p class="step-sub">Add everyone living in your home who this may help. You can add more than one.</p>
+      <div class="grid2">
+        <div class="field"><label>Total number of people in household <span class="req">*</span></label><input type="number" name="Total Household Members" min="1" max="30" inputmode="numeric" required></div>
+      </div>
       <div id="hhList"></div>
       <button type="button" class="add-hh" id="addHh">＋ Add household member</button>
 
@@ -97,7 +101,7 @@
 
       <div class="note-box">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h1v4h1" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        <span>You do not need to upload anything now. If a photo of your Medicaid card is needed, our team will help you with it when we contact you.</span>
+        <span>Nothing here is a test you can fail — these questions just help our team serve you better.</span>
       </div>
 
       <div class="field full"><label>Does anyone in your household have a serious or chronic health condition?</label>
@@ -110,19 +114,10 @@
       <div class="field full"><label>If yes, please specify the condition(s)</label>
         <input name="Condition Details" placeholder="e.g. diabetes, heart condition…"></div>
 
-      <div class="field full"><label>In the past 12 months, did you worry your food would run out before you had money for more? <span class="req">*</span></label>
-        <select name="Food Insecurity" required>
-          <option value="">Select…</option>
-          <option>Often true</option><option>Sometimes true</option><option>Never true</option>
-        </select>
-        <div class="hint">An answer of "Never true" generally does not qualify for services.</div>
-      </div>
-
-      <div class="field full"><label>Are you currently receiving home-delivered meals through a NYS social services program? <span class="req">*</span></label>
-        <select name="Currently Receiving Meals" required>
-          <option value="">Select…</option>
-          <option>No</option><option>Yes</option>
-        </select>
+      <div class="field full"><label>Photo of your Medicaid card <span style="font-weight:400;color:#7a8577">(optional)</span></label>
+        <input type="file" id="medicaidCard" name="attachment" accept="image/png,image/jpeg,application/pdf">
+        <div class="hint">If it's handy, a photo or PDF of your Medicaid card helps us process your application faster — but you can always send it later. Max 10&nbsp;MB.</div>
+        <div class="hint" id="fileError" style="color:#e0523a;display:none">That file is over 10&nbsp;MB — please choose a smaller photo, or skip it and we'll help you later.</div>
       </div>
 
       <div class="field full"><label>Anything else we should know?</label>
@@ -130,7 +125,7 @@
 
       <div class="consent">
         <input type="checkbox" id="consent" name="Consent" value="I agree" required>
-        <label for="consent">I confirm the information provided is accurate and complete to the best of my knowledge, and I consent to Free Food Stockpile using it for program enrollment and coordination. <span class="req">*</span></label>
+        <label for="consent">I agree to be contacted about these services and consent to Free Food Stockpile sharing the information I provide with a contracted Social Care Network partner to coordinate services. I understand this is voluntary, free, will not affect my Medicaid benefits, and is not an application for government benefits. <span class="req">*</span></label>
       </div>
 
       <!-- FormSubmit config -->
@@ -149,8 +144,9 @@
       <div class="success">
         <div class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M20 6 9 17l-5-5" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
         <h2>Application received!</h2>
-        <p>Thank you. Our local team will review your information and reach out to you soon to arrange your
-          free food and meal support. If you have questions, call or text us at <a href="tel:+18452480680">(845) 248-0680</a>.</p>
+        <p>Thank you — we'll take it from here. Our team reviews every application personally and will reach
+          out if we need anything else. We're here to help you get approved. Questions in the meantime?
+          Call or text us at <a href="tel:+18455405512">(845) 540-5512</a>.</p>
         <p style="margin-top:20px"><a href="index.html" class="btn">Back to home</a></p>
       </div>
     </section>
