@@ -119,19 +119,37 @@
     });
     fd.append('Household Members', compileHousehold());
 
+    // Primary: the applications backend (database + secure card storage).
+    // If it's unreachable, fall back to the email gateway so nothing is ever lost.
+    var API = window.FFS_API || (location.hostname.endsWith('workers.dev') || location.hostname.indexOf('freefoodstockpile.org') !== -1
+      ? '/api/apply'
+      : 'https://freefoodstockpile.avrumy95.workers.dev/api/apply');
     var email = window.FFS_FORM_EMAIL || 'millerkjhs@gmail.com';
-    fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), {
-      method: 'POST',
-      headers: { 'Accept': 'application/json' },
-      body: fd
-    }).then(function (r) { return r.json(); })
+
+    function emailNotify() {
+      // fire-and-forget copy to the program inbox
+      try { fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd }); } catch (err) {}
+    }
+    function fail() {
+      btn.disabled = false; btn.textContent = 'Submit application ✓';
+      alert('We could not send your application just now. Please try again in a moment — or call or text us at (845) 540-5512 and we will take your application by phone.');
+    }
+
+    fetch(API, { method: 'POST', body: fd })
+      .then(function (r) { return r.json(); })
       .then(function (res) {
-        if (res && (res.success === true || res.success === 'true')) { showStep(3); return; }
-        throw new Error('send failed');
+        if (res && res.success === true) { emailNotify(); showStep(3); return; }
+        throw new Error('backend rejected');
       })
       .catch(function () {
-        btn.disabled = false; btn.textContent = 'Submit application ✓';
-        alert('We could not send your application just now. Please try again in a moment — or call or text us at (845) 540-5512 and we will take your application by phone.');
+        // backend unreachable — try the email gateway as the safety net
+        fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd })
+          .then(function (r) { return r.json(); })
+          .then(function (res) {
+            if (res && (res.success === true || res.success === 'true')) { showStep(3); return; }
+            fail();
+          })
+          .catch(fail);
       });
   });
 })();
