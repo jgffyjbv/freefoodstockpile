@@ -54,7 +54,7 @@
       '<button type="button" class="rm">Remove ✕</button>' +
       '<div class="grid2">' +
         '<div class="field"><label>Full name <span class="req">*</span></label><input class="hh-name" placeholder="Name"></div>' +
-        '<div class="field"><label>Date of birth</label><input type="date" class="hh-dob"><div class="hint">Optional — but including it helps us process your application faster.</div></div>' +
+        '<div class="field"><label>Date of birth <span class="req">*</span></label><input type="date" class="hh-dob"><div class="hint">Used to confirm eligibility.</div></div>' +
         '<div class="field full"><label>Relationship</label><input class="hh-rel" placeholder="e.g. spouse, child, parent"></div>' +
       '</div>';
     d.querySelector('.rm').addEventListener('click', function () { d.remove(); });
@@ -63,14 +63,18 @@
   });
 
   function validateHousehold() {
-    var ok = true;
+    var ok = true, first = null;
     hhList.querySelectorAll('.hh-member').forEach(function (m) {
       var name = m.querySelector('.hh-name');
-      var hasAny = name.value.trim() || m.querySelector('.hh-dob').value.trim() || m.querySelector('.hh-rel').value.trim();
-      var bad = hasAny && !name.value.trim();
-      name.style.borderColor = bad ? '#e0523a' : '';
-      if (bad) { ok = false; name.focus(); }
+      var dob = m.querySelector('.hh-dob');
+      var hasAny = name.value.trim() || dob.value.trim() || m.querySelector('.hh-rel').value.trim();
+      [name, dob].forEach(function (inp) {
+        var bad = hasAny && !inp.value.trim();
+        inp.style.borderColor = bad ? '#e0523a' : '';
+        if (bad) { ok = false; if (!first) first = inp; }
+      });
     });
+    if (first) { first.focus(); first.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     return ok;
   }
 
