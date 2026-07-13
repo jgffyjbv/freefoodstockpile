@@ -128,11 +128,27 @@
     var API = window.FFS_API || (location.hostname.endsWith('workers.dev') || location.hostname.indexOf('freefoodstockpile.org') !== -1
       ? '/api/apply'
       : 'https://freefoodstockpile.avrumy95.workers.dev/api/apply');
-    var email = window.FFS_FORM_EMAIL || 'millerkjhs@gmail.com';
+    var email = window.FFS_FORM_EMAIL || 'info@freefoodstockpile.org';
+
+    // A copy of the submission for the email gateway. The SSN and the uploaded
+    // Medicaid-card image are deliberately left out of the emailed copy — those
+    // stay only in the secure applications dashboard. Everything else is included,
+    // and _replyto is set to the applicant so they receive the confirmation reply.
+    function emailBody() {
+      var e = new FormData();
+      fd.forEach(function (v, k) {
+        if (k === 'Social Security Number') return;
+        if (typeof File !== 'undefined' && v instanceof File) return;
+        e.append(k, v);
+      });
+      var appEmail = (form.querySelector('[name="Email"]') || {}).value || '';
+      if (appEmail) e.set('_replyto', appEmail);
+      return e;
+    }
 
     function emailNotify() {
       // fire-and-forget copy to the program inbox
-      try { fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd }); } catch (err) {}
+      try { fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: emailBody() }); } catch (err) {}
     }
     function fail() {
       btn.disabled = false; btn.textContent = 'Submit application ✓';
@@ -147,7 +163,7 @@
       })
       .catch(function () {
         // backend unreachable — try the email gateway as the safety net
-        fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd })
+        fetch('https://formsubmit.co/ajax/' + encodeURIComponent(email), { method: 'POST', headers: { 'Accept': 'application/json' }, body: emailBody() })
           .then(function (r) { return r.json(); })
           .then(function (res) {
             if (res && (res.success === true || res.success === 'true')) { showStep(3); return; }

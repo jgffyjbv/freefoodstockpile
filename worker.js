@@ -32,21 +32,72 @@ function corsHeaders(req) {
 const json = (data, status, extra) =>
   new Response(JSON.stringify(data), { status: status || 200, headers: Object.assign({ 'Content-Type': 'application/json' }, extra || {}) });
 
-/* ---------- session auth (HMAC cookie derived from ADMIN_PASSWORD) ---------- */
+/* ---------- password + session auth ----------
+   The admin password lives in the D1 `settings` table (PBKDF2 hash + salt), so it
+   can be changed from the dashboard and reset without redeploying. Sessions are
+   signed with a stable random `session_secret` (also in settings), so changing the
+   password does not silently break the signing key. env.ADMIN_PASSWORD is only a
+   one-time migration seed if the table was never initialised. */
+function bytesToHex(buf) { return [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join(''); }
+function hexToBytes(hex) { return Uint8Array.from((hex.match(/../g) || []).map(h => parseInt(h, 16))); }
+function randHex(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return bytesToHex(a); }
+function timingSafeEqualHex(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string' || a.length !== b.length) return false;
+  let r = 0;
+  for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return r === 0;
+}
 async function hmac(secret, msg) {
   const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   const sig = await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(msg));
-  return [...new Uint8Array(sig)].map(b => b.toString(16).padStart(2, '0')).join('');
+  return bytesToHex(sig);
+}
+async function pbkdf2Hex(password, saltHex, iter) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', salt: hexToBytes(saltHex), iterations: iter, hash: 'SHA-256' }, key, 256);
+  return bytesToHex(bits);
+}
+async function getSetting(env, key) {
+  const r = await env.DB.prepare('SELECT value FROM settings WHERE key=?').bind(key).first();
+  return r ? r.value : null;
+}
+async function setSetting(env, key, value) {
+  await env.DB.prepare('INSERT INTO settings (key,value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(key, value).run();
+}
+async function setPassword(env, password) {
+  const salt = randHex(16);
+  await setSetting(env, 'pw_salt', salt);
+  await setSetting(env, 'pw_iter', '100000');
+  await setSetting(env, 'pw_hash', await pbkdf2Hex(password, salt, 100000));
+}
+async function loadSecret(env) {
+  let secret = null;
+  try { secret = await getSetting(env, 'session_secret'); } catch (e) { /* table missing */ }
+  if (secret) return secret;
+  await env.DB.prepare('CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)').run();
+  secret = await getSetting(env, 'session_secret');
+  if (!secret) { secret = randHex(32); await setSetting(env, 'session_secret', secret); }
+  if (!(await getSetting(env, 'pw_hash')) && env.ADMIN_PASSWORD) { await setPassword(env, env.ADMIN_PASSWORD); }
+  return secret;
+}
+async function verifyPassword(env, password) {
+  const pw = String(password == null ? '' : password).trim();
+  if (!pw) return false;
+  const hash = await getSetting(env, 'pw_hash');
+  const salt = await getSetting(env, 'pw_salt');
+  const iter = parseInt((await getSetting(env, 'pw_iter')) || '100000', 10);
+  if (hash && salt) return timingSafeEqualHex(await pbkdf2Hex(pw, salt, iter), hash);
+  return !!env.ADMIN_PASSWORD && pw === env.ADMIN_PASSWORD.trim();
 }
 async function makeSession(env) {
   const exp = Date.now() + 1000 * 60 * 60 * 24 * 30; // 30 days
-  return (await hmac(env.ADMIN_PASSWORD, 'ffs|' + exp)) + '.' + exp;
+  return (await hmac(await loadSecret(env), 'ffs|' + exp)) + '.' + exp;
 }
 async function checkSession(req, env) {
   const m = (req.headers.get('Cookie') || '').match(/ffs_session=([a-f0-9]+)\.(\d+)/);
   if (!m) return false;
   if (Date.now() > +m[2]) return false;
-  return (await hmac(env.ADMIN_PASSWORD, 'ffs|' + m[2])) === m[1];
+  return (await hmac(await loadSecret(env), 'ffs|' + m[2])) === m[1];
 }
 
 /* ---------- helpers ---------- */
@@ -92,7 +143,7 @@ export default {
     /* ============ ADMIN: login ============ */
     if (p === '/api/admin/login' && req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
-      if (!env.ADMIN_PASSWORD || body.password !== env.ADMIN_PASSWORD)
+      if (!(await verifyPassword(env, body.password)))
         return json({ success: false }, 401);
       const sess = await makeSession(env);
       return json({ success: true }, 200, {
@@ -103,6 +154,20 @@ export default {
     /* ============ ADMIN: API (auth required) ============ */
     if (p.startsWith('/api/admin/')) {
       if (!(await checkSession(req, env))) return json({ success: false, error: 'unauthorized' }, 401);
+
+      /* change the admin password (self-service) */
+      if (p === '/api/admin/password' && req.method === 'POST') {
+        const body = await req.json().catch(() => ({}));
+        if (!(await verifyPassword(env, body.current)))
+          return json({ success: false, error: 'Your current password is not correct.' }, 403);
+        const next = String(body.next == null ? '' : body.next).trim();
+        if (next.length < 8) return json({ success: false, error: 'Please choose a new password of at least 8 characters.' }, 400);
+        await setPassword(env, next);
+        const sess = await makeSession(env);
+        return json({ success: true }, 200, {
+          'Set-Cookie': 'ffs_session=' + sess + '; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=' + 60 * 60 * 24 * 30
+        });
+      }
 
       if (p === '/api/admin/applications' && req.method === 'GET') {
         const q = (url.searchParams.get('q') || '').trim();
@@ -203,7 +268,7 @@ const LOGIN_HTML = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><
 const go=document.getElementById('go'),pw=document.getElementById('pw');
 async function login(){
   go.disabled=true;
-  const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value})});
+  const r=await fetch('/api/admin/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:pw.value.trim()})});
   if(r.ok){location.reload();return}
   document.getElementById('err').style.display='block';go.disabled=false;pw.select();
 }
@@ -240,12 +305,33 @@ td select{width:auto;padding:6px 10px;font-size:13.5px}
 #saved{color:#2f7d4f;font-weight:700;display:none}
 </style></head><body>
 <div class="wrap">
-  <h1 style="font-size:30px">Applications</h1>
-  <p style="color:#5d6b60">Every application in one place — click a row to view, edit, and add notes.</p>
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap">
+    <div>
+      <h1 style="font-size:30px">Applications</h1>
+      <p style="color:#5d6b60">Every application in one place — click a row to view, edit, and add notes.</p>
+    </div>
+    <button class="btn" style="background:#5d6b60" id="openPw">Change password</button>
+  </div>
   <div class="stats"><div class="stat"><b id="stTotal">–</b><span>Total applications</span></div><div class="stat"><b id="stNew">–</b><span>New / unreviewed</span></div></div>
   <input id="search" placeholder="Search name, phone, Medicaid CIN, city, region…">
   <table><thead><tr><th>Date</th><th>Applicant</th><th>Phone</th><th>Medicaid CIN</th><th>Region</th><th>Card</th><th>Status</th></tr></thead>
   <tbody id="rows"></tbody></table>
+</div>
+
+<div id="pwModal" style="position:fixed;inset:0;background:rgba(20,30,22,.45);display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:8vh 14px;z-index:60">
+  <div class="card" style="max-width:420px;width:100%;position:relative">
+    <button class="close" onclick="closePw()">✕</button>
+    <h2 style="font-size:22px;margin-bottom:4px">Change password</h2>
+    <p style="color:#5d6b60;font-size:14px">Set a new password for signing in to this dashboard.</p>
+    <label for="pwCur">Current password</label>
+    <input id="pwCur" type="password" autocomplete="current-password">
+    <label for="pwNew">New password</label>
+    <input id="pwNew" type="password" autocomplete="new-password" placeholder="At least 8 characters">
+    <label for="pwNew2">Confirm new password</label>
+    <input id="pwNew2" type="password" autocomplete="new-password">
+    <p id="pwMsg" style="font-size:13.5px;margin-top:10px;display:none"></p>
+    <div class="savebar"><button class="btn" id="pwSave">Save new password</button></div>
+  </div>
 </div>
 
 <div id="detail"><div class="card">
@@ -334,5 +420,24 @@ document.getElementById('dAddNote').addEventListener('click',async()=>{
 function closeDetail(){document.getElementById('detail').style.display='none'}
 document.getElementById('detail').addEventListener('click',e=>{if(e.target.id==='detail')closeDetail()});
 let t;document.getElementById('search').addEventListener('input',e=>{clearTimeout(t);t=setTimeout(()=>load(e.target.value),300)});
+
+/* ---- change password ---- */
+const pwModal=document.getElementById('pwModal');
+function openPw(){['pwCur','pwNew','pwNew2'].forEach(id=>document.getElementById(id).value='');const m=document.getElementById('pwMsg');m.style.display='none';pwModal.style.display='flex';document.getElementById('pwCur').focus()}
+function closePw(){pwModal.style.display='none'}
+document.getElementById('openPw').addEventListener('click',openPw);
+pwModal.addEventListener('click',e=>{if(e.target.id==='pwModal')closePw()});
+document.getElementById('pwSave').addEventListener('click',async()=>{
+  const cur=document.getElementById('pwCur').value,nw=document.getElementById('pwNew').value,nw2=document.getElementById('pwNew2').value;
+  const m=document.getElementById('pwMsg');m.style.display='block';
+  if(nw.length<8){m.style.color='#c0392b';m.textContent='New password must be at least 8 characters.';return}
+  if(nw!==nw2){m.style.color='#c0392b';m.textContent='The two new-password boxes do not match.';return}
+  const btn=document.getElementById('pwSave');btn.disabled=true;
+  const r=await fetch('/api/admin/password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({current:cur,next:nw})});
+  const j=await r.json().catch(()=>({}));
+  btn.disabled=false;
+  if(r.ok&&j.success){m.style.color='#2f7d4f';m.textContent='Password changed ✓';setTimeout(closePw,1200)}
+  else{m.style.color='#c0392b';m.textContent=j.error||'Could not change the password.'}
+});
 load();
 </script></body></html>`;
